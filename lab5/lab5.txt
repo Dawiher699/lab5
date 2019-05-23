@@ -1,0 +1,399 @@
+Pliki nagłówkowe serwera:
+loguj.h:
+
+#ifndef LOGUJ_H
+#define LOGUJ_H
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <stdbool.h>
+#include <string.h>
+#include <assert.h>
+#include <ctype.h>
+#include <unistd.h>
+void loguj(char * po, char * przed);
+#endif
+
+tlumacz.h:
+
+#ifndef TLUMACZ_H
+#define TLUMACZ_H
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <stdbool.h>
+#include <string.h>
+#include <assert.h>
+#include <ctype.h>
+#include <unistd.h>
+char* tlumacz(char text[50],int n);
+#endif
+
+zwroc.h:
+
+#ifndef ZWROC_H
+#define ZWROC_H
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <stdbool.h>
+#include <string.h>
+#include <assert.h>
+#include <ctype.h>
+#include <unistd.h>
+void zwroc(char *informacja);
+#endif
+
+pobierz.h:
+
+#ifndef POBIERZ_H
+#define POBIERZ_H
+#include "tlumacz.h"
+#include "zwroc.h"
+#include "loguj.h"
+int pobierz();
+#endif
+
+zglosblad.h:
+
+#ifndef ZGLOSBLAD_H
+#define ZGLOSBLAD_H
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <stdbool.h>
+#include <string.h>
+#include <assert.h>
+#include <ctype.h>
+#include <unistd.h>
+void zglosblad();
+#endif
+
+Pliki żródłowe serwera:
+
+loguj.c:
+
+#include "loguj.h"
+void loguj(char * po, char * przed)
+{
+	FILE * log;
+	log = fopen("log.txt","a");
+	fputs(przed, log);
+	fputs(" --> ",log);
+	fputs(po,log);
+	fputs("\n",log);
+	fclose(log);
+}
+
+tlumacz.c:
+
+#include "tlumacz.h"
+char* tlumacz(char text[50],int n)
+{
+	char *result;
+	result = malloc(50*sizeof(char));
+	strcpy(result,text);
+	for(int i=0;i<50;i++)
+	{
+		if(text[i]<91&&text[i]>64)
+		{
+			result[i]=text[i]+n;
+			while(result[i]<64)
+				result[i]=result[i]+26;
+			while(result[i]>91)
+				result[i]=result[i]-26;
+		}
+		if(text[i]<122&&text[i]>96)
+		{
+			result[i]=text[i]+n;
+			while(result[i]<97)
+				result[i]=result[i]+26;
+			while(result[i]>122)
+				result[i]=result[i]-26;
+		}
+	}
+	return result;
+}
+
+zwroc.c:
+
+#include "zwroc.h"
+void zwroc(char *informacja)
+{
+	FILE *fp;
+	fp = fopen("wynik.html","w");
+	fputs("<html> \n",fp);
+	fputs("<body> \n",fp);
+	fputs("<B> \n",fp);
+	fputs(informacja,fp);
+	fputs(" </BR> \n",fp);
+	fputs("</B> \n",fp);
+	fputs("</body> \n",fp);
+	fputs("</html>",fp);
+	fclose(fp);
+}
+
+pobierz.c:
+
+#include "pobierz.h"
+int pobierz()
+{
+	FILE *fp;
+	int n;
+	bool czekaj = true;
+	while(czekaj)
+	{
+		fp = fopen("ready","r");
+		if(fp == NULL)
+		{
+			czekaj = true;
+		}
+		else
+		{
+			remove("ready");
+			czekaj=false;
+			fclose(fp);
+		}
+	}
+	char *text = malloc(50*sizeof(char));
+	memset(text,0,50);
+	fp = fopen("plik.html","r");
+	if(fp==NULL)
+	{
+		free(text);
+		return 2;
+	}
+	char *informacja=malloc(50*sizeof(char));
+	fscanf(fp,"%s",informacja);
+	while(informacja[0]=='<')
+	{
+		fscanf(fp,"%s",informacja);
+	}
+	fscanf(fp,"%s",informacja);
+	while(informacja[0]=='<')
+	{
+		if(fscanf(fp,"%s",informacja)==0)
+		{
+			free(informacja);	
+			free(text);
+			fclose(fp);
+			return 1;
+		}
+	}
+	int i=0;
+	while(informacja[i]!='\0'&&informacja[i]!='<')
+	{
+		text[i]=informacja[i];
+		i++;
+	}
+	fscanf(fp,"%s",informacja);
+	while(informacja[0]=='<')
+	{
+		if(fscanf(fp,"%s",informacja)==0)
+		{
+			free(informacja);	
+			free(text);
+			fclose(fp);
+			return 1;
+		}
+		
+	}
+	n=atoi(informacja);
+	informacja = tlumacz(text,n);
+	zwroc(informacja);
+	loguj(informacja,text);
+	free(informacja);	
+	free(text);
+	remove("plik.html");
+	fclose(fp);
+	fp = fopen("gotowe","w");
+	fclose(fp);
+	return 0;
+}
+
+zglosblad.c:
+
+#include "zglosblad.h"
+void zglosblad()
+{
+	char log[50];
+	FILE *error;
+	error = fopen("ero.txt","a");
+	fputs("blad: \0",error);
+	FILE *fp;
+	fp = fopen("plik.html","r");
+	while(fscanf(fp,"%s",log))
+	{
+		fputs(log,error);
+		fputs("\n",error);
+	}
+	fclose(error);
+	fclose(fp);
+	remove("plik.html");	
+}
+
+server.c
+
+#include "zglosblad.h"
+#include "pobierz.h"
+int main()
+{
+	FILE *error;
+	while(true)
+	{
+		if(pobierz()==1)
+		{
+			error = fopen("error","w");
+			zglosblad();
+			fclose(error);
+		}
+	}
+	return 0;
+}
+
+pliki nagłówkowe klienta:
+
+informacja.h:
+
+#ifndef INFORMACJA_H
+#define INFORMACJA_H
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <stdbool.h>
+#include <string.h>
+#include <assert.h>
+#include <ctype.h>
+#include <unistd.h>
+void informacja();
+#endif
+
+stworzplik.h
+
+#ifndef STWORPLIK_H
+#define STWORZPLIK_H
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <stdbool.h>
+#include <string.h>
+#include <assert.h>
+#include <ctype.h>
+#include <unistd.h>
+void stworzplik(char * el1, char * el2);
+#endif
+
+pliki żródłowe klienta:
+
+informacja.c:
+
+#include "informacja.h"
+void informacja()
+{
+	puts("Aby uyskać kod podaj jako argumenty kod(max 50 znakow) i klucz kodowania(z minusem aby odkodowac, znaki inne niż litery nie będą kodowane");
+}
+
+zglosblad.c:
+
+#include "zglosblad.h"
+void zglosblad()
+{
+	char log[50];
+	FILE *error;
+	error = fopen("ero.txt","a");
+	fputs("blad: \0",error);
+	FILE *fp;
+	fp = fopen("plik.html","r");
+	while(fscanf(fp,"%s",log))
+	{
+		fputs(log,error);
+		fputs("\n",error);
+	}
+	fclose(error);
+	fclose(fp);
+	remove("plik.html");
+	
+}
+
+klient.c:
+
+#include "informacja.h"
+#include "stworzplik.h"
+int main(int ile,char * arg[])
+{
+	char info[50];
+	if(ile!=3)
+	{
+		informacja();
+		return 0;
+	}
+	FILE * semaphore;
+	FILE * wynik;
+	FILE * blad;
+	bool blokada=true;
+	while(blokada)
+	{
+		semaphore = fopen("sem","r");
+		if(semaphore == NULL)
+		{
+			blokada = false;
+		}
+		else
+		{
+			blokada = true;
+			fclose(semaphore);
+		}
+	}
+	semaphore = fopen("sem","w");
+	stworzplik(arg[1],arg[2]);
+	FILE *fp;
+	fp = fopen("ready","w");
+	fclose(fp);
+	blokada = true;
+	while(blokada)
+	{
+		blad = fopen("error","r");
+		wynik = fopen("gotowe","r");
+		if(wynik == NULL)
+		{
+			if(blad==NULL)
+			{
+				blokada = true;
+			}
+			else
+			{
+				blokada = false;
+				puts("podano nieprawidlowe dane");
+				fclose(blad);
+				return 0;
+			}
+		}
+		else
+		{
+			fp = fopen("wynik.html","r");
+			blokada = false;
+			fscanf(fp,"%s",info);
+			bool niekoniec = true;
+			while(niekoniec&&info[0]=='<')
+			{
+				if(fscanf(fp,"%s",info)!=1)
+					niekoniec = false;
+			}
+			puts("twoj wynik to:");
+			puts(info);
+			fclose(fp);
+			remove("wynik.html");
+			fclose(wynik);
+		}
+	}
+	remove("gotowe");
+	fclose(semaphore);
+	remove("sem");
+	return 0;
+}
+
+Zadania te przypomniały mi podział na pliki .h i .c , nauczyły lepszego podziału na podfunkcje oraz obsługi architektury klient-serwer;
